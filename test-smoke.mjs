@@ -1,0 +1,16 @@
+import { createRequire } from 'node:module';
+import path from 'node:path'; import { mkdirSync } from 'node:fs'; import { fileURLToPath } from 'node:url';
+import { serve } from './test-serve.mjs';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const here = path.dirname(fileURLToPath(import.meta.url));
+mkdirSync(path.join(here, 'test-output', 'shots'), { recursive: true });
+const s = await serve(path.join(here,'test-output','dist-test')); const port = s.address().port;
+const b = await chromium.launch({ args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--use-gl=angle'] });
+const pg = await b.newPage({ viewport:{width:1280,height:720} });
+const logs=[]; pg.on('console',m=>logs.push(m.type()+': '+m.text())); pg.on('pageerror',e=>logs.push('PAGEERROR: '+e.message+'\n'+(e.stack||'').split('\n').slice(0,4).join('\n')));
+await pg.goto(`http://localhost:${port}/?debug&nointro`); await pg.waitForTimeout(2500);
+await pg.screenshot({path:path.join(here,'test-output','shots','title.png')});
+console.log(logs.join('\n')||'no console output');
+console.log(await pg.evaluate(()=>document.body.innerText.slice(0,300)));
+await b.close(); s.close();
